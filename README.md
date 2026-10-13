@@ -6,7 +6,11 @@
 
 ## 在线访问
 
-GitHub Pages：`https://<用户名>.github.io/<仓库名>/`
+- 演示地址：https://syhiraaaaa.github.io/vuln-triage-ticket-demo/
+- 仓库地址：https://github.com/Syhiraaaaa/vuln-triage-ticket-demo
+
+托管方式：GitHub Pages（main 分支根目录）。仓库内 `deploy_github.sh` 为一键部署脚本，
+改动后执行 `bash deploy_github.sh <GitHubToken> vuln-triage-ticket-demo` 即可重新发布。
 
 ## 演示账号
 
