@@ -814,6 +814,10 @@ table.t tr.done td{opacity:.55}
 .cb-g{font-size:12px;color:var(--gray);white-space:nowrap}
 .cb-n{font-size:12.5px;font-weight:bold;color:var(--t1);white-space:nowrap}
 .cb-s{font-size:12px;color:var(--blue);white-space:nowrap}
+/* 面包屑可点：点中间那级回到该模块的默认视图，不必绕左侧导航 */
+.crumb .cb-link{cursor:pointer;border-radius:4px;padding:2px 6px;margin:0 -2px;
+  border-bottom:1px dashed var(--border)}
+.crumb .cb-link:hover{background:var(--blue-l);color:var(--blue-d);border-bottom-color:var(--blue)}
 
 /* ============ 全局检索（顶栏） ============ */
 .gsearch{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);
@@ -2205,7 +2209,7 @@ var USERS={
           desc:'研判与决策岗位，负责漏洞结论复核与修复方案定稿'},
   zhang  :{acct:'zhang',pwd:'demo123',name:'张工',org:'应用一组',
           role:'sso 研发角色',roleKey:'dev',
-          tabs:['dash','vlist','mytask','claim','read','ticket','scan','asset','report','push'],
+          tabs:['dash','vlist','mytask','claim','read','ticket','decision','scan','asset','report','push'],
           desc:'应用一组研发，负责支付链路相关漏洞的修复实施'},
   admin  :{acct:'admin_p05',pwd:'demo123',name:'安全主管',org:'安全运营部 / 平台管理组',
           role:'sso 管理员角色',roleKey:'admin',
@@ -2219,19 +2223,19 @@ var USERS={
      角色按鉴微实际：研发角色看自己的工单与方案讨论，主管角色可仲裁。*/
   chen  :{acct:'chen',pwd:'demo123',name:'陈工',org:'订单平台',
           role:'sso 研发角色',roleKey:'dev',
-          tabs:['dash','vlist','mytask','claim','read','ticket','scan','asset','report','push'],
+          tabs:['dash','vlist','mytask','claim','read','ticket','decision','scan','asset','report','push'],
           desc:'订单平台研发，负责缓存与数据库类漏洞的修复实施'},
   li    :{acct:'li',pwd:'demo123',name:'李工',org:'运维组',
           role:'sso 研发角色',roleKey:'dev',
-          tabs:['dash','vlist','mytask','claim','read','ticket','scan','asset','report','push'],
+          tabs:['dash','vlist','mytask','claim','read','ticket','decision','scan','asset','report','push'],
           desc:'运维组研发，负责跳板机与基线类问题的处置'},
   wang  :{acct:'wang',pwd:'demo123',name:'王工',org:'应用二组',
           role:'sso 研发角色',roleKey:'dev',
-          tabs:['dash','vlist','mytask','claim','read','ticket','scan','asset','report','push'],
+          tabs:['dash','vlist','mytask','claim','read','ticket','decision','scan','asset','report','push'],
           desc:'应用二组研发，负责 Web 应用与测试环境类问题'},
   zhao  :{acct:'zhao',pwd:'demo123',name:'赵工',org:'边界安全组',
           role:'sso 研发角色',roleKey:'dev',
-          tabs:['dash','vlist','mytask','claim','read','ticket','scan','asset','report','push'],
+          tabs:['dash','vlist','mytask','claim','read','ticket','decision','scan','asset','report','push'],
           desc:'边界安全组研发，负责外联与边界设备类问题'}
 };
 var curAcct='tester';
@@ -2287,6 +2291,9 @@ function doLogin(){
     if(!checkCaptcha()){loginFail++;return;}
   }
   curAcct=hit;
+  /* 记住登录态：刷新页面不该被踢回登录页（演示场景尤其影响体验）。
+     用 sessionStorage 而非 localStorage——关掉标签页即失效，不长期占用本机。*/
+  try{sessionStorage.setItem('ins_acct',hit);}catch(e){}
   LOGIN_LOG.unshift({acct:USERS[hit].acct,name:USERS[hit].name,at:nowStr(),
     ip:'10.10.'+(1+Math.floor(Math.random()*9))+'.'+(10+Math.floor(Math.random()*80)),
     way:(Math.random()<0.5?'账号密码':'账号密码 + 图形验证码')});
@@ -2553,6 +2560,7 @@ function openAbout(){
 }
 
 function logout(){
+  try{sessionStorage.removeItem('ins_acct');}catch(e){}
   el('appBody').style.display='none';
   el('loginPage').style.display='';
   el('lgErr').textContent='';
@@ -2882,10 +2890,13 @@ function renderCrumb(){
     }
   }
   if(!g){box.innerHTML='';return;}
+  var SEP='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" '
+    +'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+  /* 中间那级（模块名）可点：点它回到该模块默认视图。
+     子分段是当前所在位置，不设链接——面包屑的惯例是末级不可点。*/
   box.innerHTML='<span class="cb-g">'+esc(g)+'</span>'
-    +'<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" '
-    +'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
-    +'<span class="cb-n">'+esc(n)+'</span>'
+    +SEP
+    +'<span class="cb-n cb-link" onclick="go(\''+cur+'\')" title="回到'+esc(n)+'">'+esc(n)+'</span>'
     +(sub?('<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" '
       +'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
       +'<span class="cb-s">'+esc(sub)+'</span>'):'');
@@ -2913,6 +2924,7 @@ function go(k){
      看着像点了没反应。curSub 同步复位，面包屑才不会带旧分段。*/
   curSub=defaultSubOf(k);
   resetSegOf(k);
+  saveNav();
   renderTabs();renderPanel();renderRight();
 }
 /* 对话助手回答时的权限感知跳转：当前角色无该模块权限就不越权跳，
@@ -2921,6 +2933,7 @@ function go(k){
 function goSafe(k){
   if(!hasTab(k))return;
   cur=k;curSub=defaultSubOf(k);resetSegOf(k);
+  saveNav();
   renderTabs();renderPanel();renderRight();
 }
 /* 各页的默认分段（一级导航进入时的落点） */
@@ -3250,6 +3263,9 @@ function judgeAdoptOne(id){
   renderAll();toast('已采纳 · 进入修复决策');
 }
 function judgeMarkFp(id){
+  var _v=getV(id);
+  // 方案已确认并派发时，不允许一句话改判误报把工单作废——先走变更方案
+  if(_v&&decLocked(_v)){lockedWarn(id,'判定误报');return;}
   var v=getV(id);
   openModal('终审判定：误报（归档）',
     '<div class="warnbox">与「驳回」的区别：<b>驳回</b>是认为 AI 结论质量有问题，打回重新研判、条目回到待处理；'
@@ -3317,9 +3333,95 @@ function confirmBatch(title,n,skip,desc,onOk){
     +'<button class="btn pri" onclick="closeModal();'+onOk+'()">确认执行</button>');
 }
 
+/* ============================================================
+   已确认方案的变更守卫
+   方案一旦「确认方向」并派发出去，就不能在漏洞列表 / 研判页一句话撤回或改判——
+   那等于单方面作废别人手上正在处理的工单，还不留依据。
+   确需调整必须走「变更方案」：写原因 → 方案回到待确认 → 通知责任人 → 全程留痕。
+   ============================================================ */
+function decLocked(v){
+  var d=v._dec,t=v._ticket;
+  var confirmed=d&&(d.state==='adopted'||d.state==='transferred');
+  var running=t&&(t.st==='sent'||t.st==='verifying'||t.st==='dispute');
+  return !!(confirmed&&running);
+}
+/* 谁能改决策：研判岗与管理员。研发可看方案、可讨论，但不改已定方案 */
+function canDecide(){
+  var r=curUser().roleKey;
+  return r==='judge'||r==='admin';
+}
+function lockedWarn(id,act){
+  var v=getV(id),t=v._ticket;
+  var stCn={sent:'处置中',verifying:'复检中',dispute:'争议中'}[t?t.st:'']||'进行中';
+  openModal('不能直接'+act,
+    '<div class="denybox">这条的修复方案<b>已经确认并派发</b>：'
+    +'决策 '+esc((v._dec&&v._dec.no)||'—')
+    +(t?(' · 工单 '+esc(t.no)+'，责任人 '+esc(t.owner)+'（'+stCn+'）'):'')
+    +'。<br><br>直接'+act+'会把别人手上正在处理的工单一并作废，而且不留变更依据。<br>'
+    +'确需调整请先走<b>「变更方案」</b>：写明原因 → 方案回到待确认 → 责任人收到通知，全过程留痕可审计。</div>',
+    '<button class="btn" onclick="closeModal()">取消</button>'
+    +'<button class="btn pri" onclick="closeModal();requestDecChange(\''+id+'\')">去变更方案</button>');
+}
+function requestDecChange(id){
+  var v=getV(id),d=decisionOf(v);
+  var curName=d.pick==='custom'?(d.custom?d.custom.t:'自定义方案')
+              :((d.dirs&&d.dirs[d.pick]||{}).t||'—');
+  openModal('变更已确认的修复方案 · '+d.no,
+    '<div class="warnbox">变更会：<br>① 决策回到<b>待确认</b>，并生成第 '+((d.round||1)+1)+' 版方向；'
+    +'<br>② 已派发工单<b>保留</b>，但标注「方案变更中」，责任人暂停按原方案执行并收到通知；'
+    +'<br>③ 变更原因与说明写入评审记录与操作日志，可审计。</div>'
+    +'<div class="kv"><span class="k">当前方案</span><span>'+esc(curName)+'</span></div>'
+    +(v._ticket?'<div class="kv"><span class="k">关联工单</span><span>'+esc(v._ticket.no)+' · 责任人 '+esc(v._ticket.owner)+'</span></div>':'')
+    +'<div class="fl">变更原因</div><div class="fv"><select id="chWhy" class="fsel">'
+    +['业务约束变化 · 停机窗口 / 依赖方调整','原方案不可行 · 实施中发现走不通',
+      '风险等级变化 · 有新情报或影响面扩大','责任人提出异议 · 采纳其技术意见',
+      '有更合适的处理路径 · 方案更优','其他（见说明）']
+      .map(function(x){return '<option>'+x+'</option>';}).join('')
+    +'</select></div>'
+    +'<div class="fl">变更说明</div><div class="fv">'
+    +'<textarea id="chNote" class="fta" placeholder="写清为什么要变，便于责任人重新确认时对齐"></textarea></div>',
+    '<button class="btn" onclick="closeModal()">取消</button>'
+    +'<button class="btn pri" onclick="doDecChange(\''+id+'\')">确认变更</button>');
+}
+function doDecChange(id){
+  var v=getV(id),d=decisionOf(v);
+  if(!canDecide()){toast('当前账号不能变更修复方案');return;}
+  var why=(document.getElementById('chWhy')||{}).value||'';
+  var note=(document.getElementById('chNote')||{}).value||'';
+  var oldName=d.pick==='custom'?(d.custom?d.custom.t:'自定义方案')
+             :((d.dirs&&d.dirs[d.pick]||{}).t||'—');
+  d.round=(d.round||1)+1;
+  d.reviews.push({by:curUser().name,act:'change',at:nowStr(),
+    note:'原方案「'+oldName+'」 · '+why+(note?'（'+note+'）':'')});
+  d.state='draft';
+  d.genBy=curUser().name+' 发起变更';
+  d.genAt=nowStr();
+  d.pick=undefined;d.pickName=null;d.custom=null;
+  d.dirs=fixDirs(v,d.round,d.locked);
+  opV(v,'变更已确认的修复方案','原方案「'+oldName+'」· '+why+(note?'（'+note+'）':''),
+      '决策回到待确认（第 '+d.round+' 版），工单标注方案变更中');
+  if(v._ticket){
+    v._ticket.decChanging=true;
+    notify(v._ticket.owner,'修复方案变更 · '+v._ticket.no,
+      curUser().name+' 发起方案变更：'+why+'。请暂停按原方案执行，等待第 '+d.round+' 版方向确认后再动。',
+      v.id,'orange','mytask');
+    var ast=v._ticket.assistants||[];
+    for(var i=0;i<ast.length;i++){
+      notify(ast[i],'修复方案变更 · '+v._ticket.no,
+        why+'。方案回到待确认，可继续参与讨论。',v.id,'orange','mytask');
+    }
+  }
+  closeModal();
+  renderPanel();renderTabs();renderRight();
+  toast('已发起方案变更 · 决策回到待确认');
+  chat('assistant','修复方案 <b>'+esc(d.no)+'</b> 已发起变更（'+esc(why)+'）：方案回到待确认状态并生成第 '
+    +d.round+' 版方向，工单<b>保留</b>但标注「方案变更中」，责任人已收到通知。变更原因与说明同时写入评审记录与操作日志。');
+}
+
 // 第10条：撤回与恢复
 function withdrawV(id){
   var v=getV(id);
+  if(decLocked(v)){lockedWarn(id,'撤回');return;}
   openModal('撤回研判结论',
     '<div class="warnbox">撤回后该条目从统计中移除、已生成的工单草稿作废，可随时恢复。'
     +'撤回记录写入操作日志。</div>'
@@ -3491,7 +3593,11 @@ function renderMyTask(){
       +'<span class="prio p'+(calcVPT(v).level===0?1:calcVPT(v).level)+'" style="margin-left:6px">'+calcVPT(v).label+'</span>'
       +'<span class="sp"></span>'
       +'<span class="st '+(t.st==='sent'?'run':(t.st==='closed'?'closed':'wait'))+'">'
-      +(t.st==='sent'?(isAssist?'待我参与':'待我处理'):(t.st==='closed'?'已闭环':'草稿'))+'</span></div>'
+      +(t.st==='sent'?(isAssist?'待我参与':'待我处理'):(t.st==='closed'?'已闭环':'草稿'))+'</span>'
+      +(t.decChanging?'<span class="tag tag-orange" style="margin-left:6px">方案变更中 · 暂停执行</span>':'')
+      +'</div>'
+      +(t.decChanging?'<div style="padding:6px 14px 0;font-size:11.5px;color:var(--orange)">'
+        +'该单的修复方案已被发起变更，新的方向确认前<b>不要按原方案执行</b>；可在下方继续参与讨论。</div>':'')
       +'<div style="padding:11px 14px">'
       +'<div style="font-weight:bold;margin-bottom:6px">'+esc(v.name)+' <span style="font-weight:normal;color:var(--t2);font-size:12px">'+v.cve+'</span></div>'
       +'<div class="kv"><span class="k">责任资产</span><span>'+esc(v.asset)+'（'+v.ip+'）· '+v.imp+' · '+v.expose+'</span></div>'
@@ -3521,8 +3627,10 @@ function renderMyTask(){
       h+='</span></div>';
     }
     h+='</div><div class="tk-f" style="border-top:1px solid var(--border);padding-top:9px;margin-top:2px">';
-    if(t.st==='sent'&&isAssist){
-      // 协办人：只能讨论与提意见，闭环按钮不出现——责任唯一属于主负责人
+    /* 协办人在工单未闭环前都可以讨论、提意见——不只是「已派发」那一段。
+       原来只在 st==='sent' 给按钮，回执后（verifying）或争议中按钮整排消失，
+       看着就像按钮是空的。闭环责任仍唯一属于主负责人。*/
+    if(isAssist&&t.st!=='closed'&&t.st!=='withdrawn'){
       h+='<button class="btn sm" onclick="discussOpen(\''+v.id+'\')">参与方案讨论</button>'
         +'<button class="btn sm" onclick="assistAdvise(\''+v.id+'\')">提出技术意见</button>'
         +'<span style="flex:1"></span><span style="font-size:11.5px;color:var(--t2)">'
@@ -3539,6 +3647,16 @@ function renderMyTask(){
       h+='<span style="color:var(--green);font-size:11.5px">'+esc(t.closeAt||'')+' 已闭环，处置结论写入经验库</span>'
         +'<span style="flex:1"></span>'
         +'<button class="btn sm" onclick="go(\'report\')">查看我的周报</button>';
+    }else if(t.st==='verifying'){
+      h+='<span style="color:var(--blue);font-size:11.5px">回执已提交，等待复检（复检通过才计入闭环）</span>'
+        +'<span style="flex:1"></span>'
+        +'<button class="btn sm" onclick="discussOpen(\''+v.id+'\')">参与方案讨论</button>';
+    }else if(t.st==='dispute'){
+      h+='<span style="color:var(--orange);font-size:11.5px">已提出异议，等待第三方仲裁后再派发或改派</span>'
+        +'<span style="flex:1"></span>'
+        +'<button class="btn sm" onclick="discussOpen(\''+v.id+'\')">参与方案讨论</button>';
+    }else if(t.st==='withdrawn'){
+      h+='<span style="color:var(--t2);font-size:11.5px">工单已随研判结论撤回作废</span>';
     }else{
       h+='<span style="color:var(--t2);font-size:11.5px">草稿尚未派发</span>';
     }
@@ -5626,6 +5744,8 @@ function arbitrateDec(id,keep){
 /* 重新研判：清掉本次结论，条目回到待处理队列，统计同步回退 */
 function reopenJudge(id){
   var v=getV(id);
+  // 同上：方案已确认并派发时不能直接重新研判，先走变更方案
+  if(decLocked(v)){lockedWarn(id,'重新研判');return;}
   if(v._judged){
     STAT.judged=Math.max(0,STAT.judged-1);
     if(v.judge==='real')STAT.real=Math.max(0,STAT.real-1);
@@ -6085,7 +6205,10 @@ function renderDecision(){
     +'<span class="desc">Agent 给出修复方向与依据，责任人确认方向后才进入工单</span><span class="sp"></span>'
     +'</div>';
   /* 决策列表 / 待我评审：分段留在页内，左侧不再重复列 */
-  var allReal=VULNS.filter(function(v){return v._judged&&v.judge==='real'&&v._adopted;});
+  /* 研发也能进这一页看自己单子的修复方向（只读），所以按可见范围过滤：
+     只列当前账号看得见的漏洞，不把别人的决策摊给他。*/
+  var allReal=VULNS.filter(function(v){
+    return v._judged&&v.judge==='real'&&v._adopted&&canSeeV(v);});
   /* 待评审 = 决策已生成但还没人确认方向。
      _dec 是懒创建的（首次渲染决策块时才建），所以不能只判 v._dec.state，
      否则刚采纳还没打开过决策块的条目会漏掉。*/
@@ -6196,12 +6319,19 @@ function decCard(v){
   h+='<div class="decops">'
     +judgeIconBtn('查看完整详情','eye',"decDetail('"+v.id+"')")
     +judgeIconBtn('展开依据','folder',"decToggleWhy('"+v.id+"')")
-    +(st==='draft'?judgeIconBtn('确认方向，进入工单','check',"adoptDecision('"+v.id+"')"):'')
-    +(st==='draft'?judgeIconBtn('不同意这个方向，改方向','edit',"editDecision('"+v.id+"')"):'')
+    +(st==='draft'&&canDecide()?judgeIconBtn('确认方向，进入工单','check',"adoptDecision('"+v.id+"')"):'')
+    +(st==='draft'&&canDecide()?judgeIconBtn('不同意这个方向，改方向','edit',"editDecision('"+v.id+"')"):'')
+    // 方案已定：不能直接改方向，只能走「变更」——写原因、留记录、通知责任人
+    +((st==='adopted'||st==='transferred')&&canDecide()
+        ?judgeIconBtn('变更已确认方案（写原因）','edit',"requestDecChange('"+v.id+"')"):'')
     +judgeIconBtn('撤回这条决策','undo',"withdrawV('"+v.id+"')")
     +opTrackBtn(v.id,opsOfV(v.id).length)
     +(v._ticket?'':'<button class="btn sm" onclick="decMakeTicket(\''+v.id+'\')">生成工单草稿</button>')
     +'</div>';
+  if(!canDecide()){
+    h+='<div style="font-size:11.5px;color:var(--t3);margin-top:4px">'
+      +'🔒 你在这一页是<b>只读</b>：方案由研判岗确认。若对方向有意见，去「我的任务」参与方案讨论或提出技术意见。</div>';
+  }
 
   // 评审记录：有就显示，让人知道谁确认过
   if(d.reviews&&d.reviews.length){
@@ -8444,7 +8574,7 @@ function renderLearn(){
 var ROLE_NAME={judge:'sso 研判角色',dev:'sso 研发角色',admin:'sso 管理员角色',audit:'sso 审计角色'};
 var ROLE_TABS={
   judge:['dash','vlist','judge','decision','read','ticket','scan','asset','report','push','ops','sla','learn'],
-  dev:['dash','vlist','mytask','claim','read','ticket','scan','asset','report','push'],
+  dev:['dash','vlist','mytask','claim','read','ticket','decision','scan','asset','report','push'],
   admin:['dash','vlist','judge','decision','read','ticket','scan','asset','report','archive','push','ops','sla','learn','users','anomaly'],
   audit:['dash','archive','report','ops','sla','anomaly']
 };
@@ -8581,17 +8711,19 @@ function renderUsers(){
       +'<td>'+(u.disabled?'<span class="badgebox no">已停用</span>':'<span class="badgebox ok">正常</span>')+'</td>'
       +'<td class="mono" style="font-size:11.5px">'+esc(last)+'</td>'
       +'<td><div class="rowops">'
-      +'<button class="iconbtn" title="改角色" onclick="askChangeRole(\''+k+'\')">'
+      /* 传账号 key 而不是下标：ks 是 Object.keys(USERS) 的数组，
+         传 k 会变成 USERS['0'] → undefined，点「改角色」直接抛异常 */
+      +'<button class="iconbtn" title="改角色" onclick="askChangeRole(\''+ks[k]+'\')">'
       +'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">'
       +'<path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1"/></svg></button>'
-      +'<button class="iconbtn" title="看该账号的操作记录" onclick="showUserOps(\''+k+'\')">'
+      +'<button class="iconbtn" title="看该账号的操作记录" onclick="showUserOps(\''+ks[k]+'\')">'
       +'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">'
       +'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></button>'
-      +'<span class="swbtn'+(u.disabled?'':' on')+(k===curAcct?' dis':'')+'" title="'
-      +(k===curAcct?'不能停用自己正在使用的账号':(u.disabled?'点击启用':'点击停用'))+'" '
-      +'onclick="'+(k===curAcct
+      +'<span class="swbtn'+(u.disabled?'':' on')+(ks[k]===curAcct?' dis':'')+'" title="'
+      +(ks[k]===curAcct?'不能停用自己正在使用的账号':(u.disabled?'点击启用':'点击停用'))+'" '
+      +'onclick="'+(ks[k]===curAcct
           ?'toast(&quot;不能停用自己正在使用的账号&quot;)'
-          :'doToggleUser(\''+k+'\')')+'">'
+          :'doToggleUser(\''+ks[k]+'\')')+'">'
       +'<i></i></span>'
       +'</div></td></tr>';
   }
@@ -9761,6 +9893,24 @@ function openOnboard(){var ob=el('onboard');if(ob)ob.classList.add('on');}
 function closeOnboard(remember){var ob=el('onboard');if(ob)ob.classList.remove('on');if(remember){try{localStorage.setItem('ins_demo_onboard','1');}catch(e){}}}
 function maybeOnboard(){try{if(localStorage.getItem('ins_demo_onboard')==='1')return;}catch(e){}openOnboard();}
 
+/* ---------------- 刷新恢复 ----------------
+   刷新页面不该被踢回登录页：登录态记在 sessionStorage（关标签页即失效）。
+   数据仍是每次重新播种——「登录态保留」和「演示数据重置」是两件事，不冲突。*/
+function saveNav(){try{sessionStorage.setItem('ins_cur',cur);}catch(e){}}
+function restoreSession(){
+  var k=null;
+  try{k=sessionStorage.getItem('ins_acct');}catch(e){}
+  if(!k||!USERS[k]||USERS[k].disabled)return false;
+  curAcct=k;
+  el('loginPage').style.display='none';
+  el('appBody').style.display='';
+  applyUserBar();
+  var last=null;try{last=sessionStorage.getItem('ins_cur');}catch(e){}
+  cur=(last&&hasTab(last))?last:((USERS[k].roleKey==='dev')?'mytask':'dash');
+  if(!hasTab(cur))cur='dash';
+  renderAll();
+  return true;
+}
 /* ---------------- 启动 ---------------- */
 BASE_TS=(new Date()).getTime();
 newCaptcha();
@@ -9773,7 +9923,12 @@ ANO_INIT=true;
 anoPatrolSync();
 anoAlert(true);
 renderBell();
-document.addEventListener('DOMContentLoaded',function(){renderObSteps();maybeOnboard();});
+var RESTORED=restoreSession();
+document.addEventListener('DOMContentLoaded',function(){
+  renderObSteps();
+  // 从刷新里恢复的会话不再弹首屏引导——人已经在用了，再弹一次是打扰
+  if(!RESTORED)maybeOnboard();
+});
 
 </script>
 </div><!-- /appBody -->
